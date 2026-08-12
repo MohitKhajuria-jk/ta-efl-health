@@ -1,0 +1,42 @@
+# --- Python -----------------------------------------------------------------
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- Patient data -----------------------------------------------------------
+# Real clinical CSVs must never be committed. The loaders fall back to
+# synthetic cohorts, so the project still runs for anyone who clones it.
+data/*.csv
+data/*.xlsx
+data/*.parquet
+
+# --- LaTeX build artefacts --------------------------------------------------
+# main.pdf is kept deliberately: it is the deliverable.
+paper/*.aux
+paper/*.log
+paper/*.blg
+paper/*.bbl
+paper/*.out
+paper/*.synctex.gz
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.toc
+paper/overleaf/*.aux
+paper/overleaf/*.log
+paper/overleaf/*.blg
+paper/overleaf/*.bbl
+paper/overleaf/*.out
+
+# --- Office / OS ------------------------------------------------------------
+*.lnk
+~$*.docx
+~$*.xlsx
+~$*.pptx
+.DS_Store
+Thumbs.db
+desktop.ini

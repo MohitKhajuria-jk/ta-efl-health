@@ -1,0 +1,4 @@
+Trust signal,AUC,Detection margin
+both (α=0.5),0.805 +/- 0.013,+0.243 +/- 0.111
+update-only (α=1),0.800 +/- 0.017,-0.095 +/- 0.127
+explanation-only (α=0),0.810 +/- 0.018,+0.513 +/- 0.296

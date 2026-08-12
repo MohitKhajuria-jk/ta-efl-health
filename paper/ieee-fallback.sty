@@ -1,0 +1,46 @@
+% ieee-fallback.sty
+% Minimal IEEE-like two-column layout, used only when IEEEtran.cls is not
+% installed. main.tex prefers the real IEEEtran class when it is available;
+% this file exists so the paper still compiles (and looks close to IEEE
+% conference format) on machines without the IEEE class files.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{ieee-fallback}[2026/08/11 Minimal IEEE-like layout]
+
+\RequirePackage[letterpaper,top=0.75in,bottom=1.0in,left=0.625in,
+                right=0.625in,columnsep=0.25in]{geometry}
+\RequirePackage{mathptmx}
+\RequirePackage{titlesec}
+\RequirePackage{caption}
+
+\setlength{\parindent}{1em}
+\setlength{\parskip}{0pt}
+\captionsetup{font=small,labelsep=period}
+\captionsetup[table]{font=small,textfont=sc,labelsep=newline,justification=centering}
+
+\renewcommand{\thesection}{\Roman{section}}
+\renewcommand{\thesubsection}{\Alph{subsection}}
+\titleformat{\section}[block]{\centering\normalsize\scshape}{\thesection.}{0.5em}{}
+\titleformat{\subsection}[block]{\normalsize\itshape}{\thesubsection.}{0.5em}{}
+\titlespacing*{\section}{0pt}{1.0ex plus .2ex}{0.6ex}
+\titlespacing*{\subsection}{0pt}{0.8ex plus .2ex}{0.4ex}
+
+% --- IEEEtran-compatible author/title macros -------------------------------
+% No \par here: article's \maketitle typesets \@author inside a tabular cell,
+% where \par is illegal. A trailing \\ starts the affiliation on a new row.
+\newcommand{\IEEEauthorblockN}[1]{{\normalsize #1}\\}
+% Not braced: the argument contains \\ line breaks, and \\ inside a group
+% within a tabular cell raises "Missing } inserted".
+\newcommand{\IEEEauthorblockA}[1]{\small\itshape #1}
+\newcommand{\IEEEpeerreviewmaketitle}{}
+\newcommand{\IEEEtriggeratref}[1]{}
+
+\newenvironment{IEEEkeywords}%
+  {\vspace{0.6ex}\noindent\small\textit{Index Terms}---}%
+  {\vspace{0.8ex}}
+
+% Abstract in IEEE style: bold run-in heading, small type.
+\renewenvironment{abstract}%
+  {\noindent\small\textbf{Abstract}---}%
+  {\par\vspace{0.4ex}}
+
+\endinput

@@ -1,0 +1,901 @@
+% Trust-Aware Explainable Federated Learning for Personalized Healthcare
+% Risk Prediction -- IEEE conference format.
+% Compile order: pdflatex -> bibtex -> pdflatex -> pdflatex
+\documentclass[conference]{IEEEtran}
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{cite}
+\graphicspath{{figures/}}
+
+\begin{document}
+
+\title{Trust-Aware Explainable Federated Learning for\\Personalized
+Healthcare Risk Prediction}
+
+% Six authors in a 3 x 2 grid. A nested tabular is used rather than
+% \IEEEauthorblockN/\and so the block renders identically under IEEEtran and
+% under the fallback layout.
+\author{\small\setlength{\tabcolsep}{3pt}%
+\begin{tabular}{@{}ccc@{}}
+\begin{tabular}[t]{@{}c@{}}
+ Dr H R Ravikumar\\
+ \textit{Computer Science and Engineering}\\
+ \textit{Sai Vidya Institute of Technology}\\
+ Bengaluru, India\\
+ ravikumar.hr@saividya.ac.in
+\end{tabular} &
+\begin{tabular}[t]{@{}c@{}}
+ Asst. Prof. Lalitha K\\
+ \textit{Computer Science and Engineering}\\
+ \textit{Sai Vidya Institute of Technology}\\
+ Bengaluru, India\\
+ lalitha.k@saividya.ac.in
+\end{tabular} &
+\begin{tabular}[t]{@{}c@{}}
+ Sahil Kumar\\
+ \textit{Computer Science and Engineering}\\
+ \textit{Sai Vidya Institute of Technology}\\
+ Bengaluru, India\\
+ sahil.kumar.23.cs@gmail.com
+\end{tabular} \\ \noalign{\vskip 1.3em}
+\begin{tabular}[t]{@{}c@{}}
+ Mohit Khajuria\\
+ \textit{Computer Science and Engineering}\\
+ \textit{Sai Vidya Institute of Technology}\\
+ Bengaluru, India\\
+ iammohitkhajuria@gmail.com
+\end{tabular} &
+\begin{tabular}[t]{@{}c@{}}
+ Manjunath K R\\
+ \textit{Computer Science and Engineering}\\
+ \textit{Sai Vidya Institute of Technology}\\
+ Bengaluru, India\\
+ manjunathkr14379@gmail.com
+\end{tabular} &
+\begin{tabular}[t]{@{}c@{}}
+ Prem Kumar S\\
+ \textit{Computer Science and Engineering}\\
+ \textit{Sai Vidya Institute of Technology}\\
+ Bengaluru, India\\
+ premkumarsprem234@gmail.com
+\end{tabular}
+\end{tabular}}
+
+\date{}
+\maketitle
+
+\begin{abstract}
+Federated learning (FL) enables several hospitals to train a shared clinical
+risk model without exchanging patient records, but standard aggregation such
+as FedAvg assumes every participant is honest. A single institution that
+submits poisoned updates can degrade the global model for all participants,
+and conventional defences based only on update geometry become unreliable
+when client data are strongly non-independent and identically distributed
+(non-IID). This paper presents TA-EFL, a trust-aware and explainable
+federated framework in which the server derives a per-client trust score from
+the \emph{extrapolated attribution signature} of each submitted parameter
+vector, evaluated on a shared public reference set, and aggregates updates in
+proportion to $n_k T_k^{\gamma}$. Because the signature is recomputed
+server-side from the weights a client actually submits, it cannot be spoofed
+by reporting fabricated explanations. The framework is implemented on the
+Flower FL framework with a logistic-regression risk model whose exact
+closed-form SHAP values yield a personalized attribution for every
+individual prediction rather than a single global feature ranking. Across five
+tabular clinical prediction tasks and six experiments, trust-weighted
+aggregation retains an area under the ROC curve (AUC) of $0.810 \pm 0.018$
+with two of six clients malicious, where FedAvg falls to $0.769 \pm 0.067$;
+an extrapolation factor of $\kappa=4$ raises the honest/attacker separation
+margin to $+0.807$ from $+0.066$ at $\kappa=1$. A sensitivity sweep over the
+trust-weighting parameter $\alpha$ shows that, \emph{in this experimental
+configuration}, relying on explanation consistency alone ($\alpha=0$) gives
+the largest separation margin, while AUC varies little across the sweep. All
+datasets are public or synthetic and all hospitals are simulated; the system
+is a research prototype and its outputs are risk estimates, not medical
+diagnoses.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Federated learning, trust-aware aggregation, model poisoning, explainable
+artificial intelligence, SHAP, healthcare risk prediction, non-IID data.
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+Clinical risk prediction models are most useful when they are trained on
+data from many institutions, because a single hospital rarely observes a
+patient population that is broad enough to support a model that generalises.
+Patient records, however, are among the most tightly regulated categories of
+personal data, and centralising them across institutional boundaries is often
+legally and practically infeasible. Even where federation removes the need to
+pool data, a recent scoping review finds that governance obligations do not
+disappear but are redistributed across the participating
+institutions \cite{eden2025governance}.
+
+Federated learning (FL) addresses this tension by moving computation to the
+data. Each participating hospital trains on
+its own records and transmits only model parameters; a coordinating server
+aggregates those parameters into a global model. FL has attracted sustained
+interest in healthcare precisely because it offers multi-institution scale
+without a central data repository. A recent systematic review of 612 studies confirms both the breadth of this activity and how little of it has reached deployment: only 5.2\% of the surveyed work reports a real-world application \cite{teo2024fl}.
+
+Two problems limit the direct application of FL to clinical settings.
+
+First, aggregation is trusting by construction. FedAvg
+computes a sample-size weighted mean of client parameters and therefore
+grants an adversarial participant influence in proportion to its claimed
+dataset size. Label flipping, additive noise and scaled model poisoning are
+all straightforward to implement by a participating institution, and recent surveys catalogue the resulting attack surface in detail \cite{sagar2023poisoning}. Byzantine-robust aggregation
+rules such as Krum and the coordinate-wise median
+ reduce this exposure by treating outlying updates as
+suspicious, but they infer malice from the geometry of the update alone. In
+healthcare, client distributions genuinely differ---a tertiary cardiac centre
+and a rural clinic legitimately produce dissimilar updates---so
+geometry-based outlier rejection risks penalising honest heterogeneity.
+
+Second, a model that influences clinical thinking must be interpretable. Post
+hoc attribution methods, particularly SHAP, grounded
+in the Shapley value, are now standard for explaining
+individual predictions, and the wider explainable AI literature argues that
+high-stakes decisions require faithful explanations rather than plausible
+narratives. In federated
+settings, explanations are usually treated purely as an output artefact
+presented to clinicians after training has finished.
+
+\textbf{Research gap.} These two concerns are typically addressed
+separately: robustness work examines parameter geometry, and explainability
+work examines the final model. The explanation signal is not used as evidence
+about whether a client is behaving honestly. This is a missed opportunity,
+because a poisoned model frequently attributes risk to the wrong features, or
+with inverted sign, even when the norm and direction of its update look
+unremarkable. A further difficulty is that a client cannot simply be asked to
+report its own explanations, since a malicious participant would report
+whatever explanation best conceals its behaviour.
+
+\textbf{Contributions.} This paper makes the following contributions.
+\begin{enumerate}
+ \item A trust-aware federated aggregation scheme in which per-client trust
+ is derived from \emph{explanation consistency} in addition to update
+ geometry, combined through an exponential moving average and applied
+ as aggregation weights $p_k \propto n_k T_k^{\gamma}$ with a hard
+ exclusion threshold $\tau$.
+ \item An \emph{extrapolated attribution signature}, computed entirely
+ server-side by amplifying each client's update direction by a factor
+ $\kappa$ before taking the signed attribution vector on a shared
+ public reference set. Because it is derived from the submitted
+ weights, it cannot be forged, and the amplification makes an
+ inverted-attribution client detectable well before its update norm
+ becomes anomalous.
+ \item An implementation on the Flower framework
+ with a desktop application that presents
+ per-patient risk estimates together with both human-readable and
+ technical SHAP explanations.
+ \item An empirical study of six experiments spanning attack fraction,
+ trust-component ablation, extrapolation sensitivity, heterogeneity
+ false positives, cross-dataset generalisation, and sensitivity to
+ the trust-weighting parameter, reported with per-seed variability
+ and with negative results retained.
+\end{enumerate}
+
+\section{Related Work}
+
+\subsection{Federated learning and aggregation}
+The standard federated training loop---broadcast the global model, train
+locally for several epochs, and average the returned parameters weighted by
+local sample count---is known as federated averaging, or FedAvg. Its
+convergence behaviour and its sensitivity to statistical heterogeneity are
+well documented, and the non-IID setting in particular is recognised as the
+regime in which averaging assumptions weaken. The Flower framework provides a
+framework-agnostic implementation with pluggable server-side strategies, which
+is the mechanism this work extends.
+
+\subsection{Trustworthiness in federated learning}
+Surveys of trustworthy FL organise the field along axes of robustness,
+privacy, fairness and explainability, and observe that these properties are
+usually pursued in isolation \cite{tariq2023trustworthy}. FederatedTrust
+\cite{sanchez2023federatedtrust} operationalises this view, computing a
+trustworthiness score for an FL deployment from more than thirty metrics
+spanning privacy, robustness, fairness, explainability, accountability and
+federation. That score characterises the deployment as a whole; the mechanism
+proposed here instead assigns trust to individual participants during
+training, and couples two of those pillars directly by using explainability as
+the evidence on which robustness decisions are made.
+
+\subsection{Poisoning and Byzantine-robust aggregation}
+Model poisoning in FL has been demonstrated through adversarial-lens
+analysis, backdoor insertion, and attacks crafted specifically against robust
+aggregators. Established defences include Krum, which selects the update
+closest to its neighbours, and the coordinate-wise median or trimmed mean,
+which bound the influence of extreme coordinates. These rules share an
+assumption: that a malicious update is geometrically atypical. That assumption
+can itself be attacked, and the recent taxonomy in \cite{sagar2023poisoning}
+organises such attacks by adversary knowledge, target and stage of the
+training pipeline. A systematisation of the area \cite{zhang2025sok} notes
+that defences are frequently evaluated against a narrow set of attacks and
+proposes a unified benchmark---a caution the present study shares, since three
+attack types are evaluated here rather than an exhaustive set.
+More recent defences acknowledge the same limitation from the opposite
+direction: Molina-Coronado \cite{molina2024celtibero} reports that defences
+which perform well on independent and identically distributed client data
+often degrade once that assumption is relaxed, and proposes layered
+aggregation in response.
+
+\subsection{Explainable AI}
+SHAP unifies additive attribution methods under the Shapley value from
+cooperative game theory and, for linear models, admits an exact closed form.
+Local surrogate methods such as LIME provide an alternative route to
+per-instance explanation. A recurring argument in the interpretability
+literature is that inherently interpretable models are preferable for
+high-stakes decisions, rather than opaque models explained after the fact---an
+argument that motivates the choice of a linear risk model in this work.
+
+\subsection{Federated learning in healthcare}
+Teo \emph{et al.} \cite{teo2024fl} systematically review clinical FL
+applications and technical architectures, and a complementary review
+\cite{ali2024flhealth} focuses specifically on model misconduct and security
+in healthcare deployments. Earlier work established the case
+for FL in digital health, demonstrated multi-institutional training without
+data sharing, and reported large multi-national federated studies for clinical
+outcome prediction. Privacy analyses of gradient leakage show that
+transmitting parameters is not by itself sufficient for privacy. On the engineering side, Fed-BioMed
+\cite{cremonesi2023fedbiomed} argues that moving FL from simulation into
+hospital practice is as much a software, networking and governance problem as
+a modelling one---a gap that separates the present prototype from clinical
+deployment.
+
+\subsection{Gap addressed here}
+A scoping review of the intersection between FL and explainable AI
+\cite{lopezramos2024} finds that the two are usually combined so that
+explanations are produced \emph{from} a federated model, rather than used
+\emph{within} the federated protocol itself. Where explanations have been
+brought inside the protocol, the form differs from the mechanism proposed
+here: LR-XFL \cite{zhang2024lrxfl} has clients upload logic rules alongside
+model updates and weights aggregation by the quality of those rules, and
+subsequent work attaches uncertainty estimates to federated explanations
+\cite{zhang2025uncertainty}. Both rely on clients reporting explanatory
+artefacts, which an adversarial participant could craft. Consistent with the
+scoping review's finding, existing trust or reputation mechanisms for FL
+otherwise score clients using update statistics, validation loss on held-out
+data, or historical behaviour, and treat explanations as a downstream
+artefact. This
+work instead makes the attribution pattern of a submitted model a first-class
+trust signal, computes it server-side so that it cannot be spoofed, and
+amplifies it by extrapolation so that inverted attributions become
+separable early in training.
+
+\section{Proposed Methodology}
+
+\subsection{System Architecture}
+Fig.~\ref{fig:arch} shows the architecture. $K$ simulated hospitals hold
+disjoint, non-IID shards of a tabular clinical dataset. Each round, the
+Flower server broadcasts the global parameter vector, each client performs
+local training and returns parameters, and the server computes trust scores,
+aggregates, and evaluates the global model on a held-out test set. The
+desktop application consumes the resulting model to produce per-patient risk
+estimates and explanations.
+
+\begin{figure}[t]
+ \centering
+ \includegraphics[width=\columnwidth]{architecture.png}
+ \caption{TA-EFL architecture. Clients return only parameters; the server
+ derives the extrapolated attribution signature, the trust score and the
+ aggregation weights.}
+ \label{fig:arch}
+\end{figure}
+
+\subsection{Federated Learning Framework}
+The system is implemented against the Flower APIs: each hospital is a \texttt{NumPyClient} exposed
+through a \texttt{ClientApp}, and trust-weighted aggregation is a custom
+server-side \texttt{Strategy} within a \texttt{ServerApp}. Two execution
+backends are provided. The first is Flower's own simulation runtime. The
+second advances the identical strategy object a single round per invocation,
+which keeps experimental runs deterministic and allows the interface to
+report progress while training is still in flight.
+
+The local model is a binary logistic regression trained by mini-batch
+stochastic gradient descent. For parameters $\theta = (\mathbf{w}, b)$,
+\begin{equation}
+ \hat{p}(\mathbf{x}) = \sigma(\mathbf{w}^{\top}\mathbf{x} + b),
+ \qquad \sigma(z) = \frac{1}{1 + e^{-z}}.
+\end{equation}
+A linear model is chosen deliberately: it admits exact SHAP values in closed
+form, so explanations introduce no approximation error of their own, in line
+with the argument for interpretable models in high-stakes settings.
+
+The classical FedAvg baseline aggregates as
+\begin{equation}
+ \theta_g^{(t+1)} = \sum_{k=1}^{K} \frac{n_k}{\sum_{j} n_j}\,\theta_k^{(t)},
+ \label{eq:fedavg}
+\end{equation}
+where $n_k$ is the number of local training samples at client $k$. The
+coordinate-wise median baseline replaces this with an
+elementwise median over $\{\theta_k^{(t)}\}$.
+
+\subsection{Non-IID Client Partitioning}
+Training indices are divided using a Dirichlet partition. For each class $c$,
+proportions over clients are drawn as
+\begin{equation}
+ (q_{1,c},\dots,q_{K,c}) \sim \mathrm{Dir}(\alpha_{\mathrm{nIID}} \mathbf{1}_K),
+\end{equation}
+and class-$c$ indices are split accordingly, with resampling until every
+client holds at least a minimum shard size. Smaller
+$\alpha_{\mathrm{nIID}}$ yields more heterogeneous client populations. The
+partition is a deterministic function of the dataset, client count,
+$\alpha_{\mathrm{nIID}}$ and seed, so every simulated node reconstructs its
+own shard without patient data being transferred between processes.
+
+\subsection{Threat Model}
+A subset $\mathcal{M} \subset \{1,\dots,K\}$ of hospitals is malicious. They
+participate in the protocol correctly at the message level---returning
+well-formed parameter vectors and truthful sample counts---but corrupt what
+they return in one of three ways:
+\begin{itemize}
+ \item \textbf{Label flipping}: local labels are inverted, $y \mapsto 1-y$,
+ before training.
+ \item \textbf{Additive noise}: $\theta_k \mapsto \theta_k + \varepsilon$,
+ $\varepsilon \sim \mathcal{N}(0, \sigma^{2} I)$ with $\sigma = 1.0$.
+ \item \textbf{Scaled model poisoning}: $\theta_k \mapsto \theta_g +
+ s(\theta_k - \theta_g)$ with $s = 8.0$.
+\end{itemize}
+The server is honest, observes only submitted parameters and sample counts,
+and holds a small public reference set $X_{\mathrm{ref}}$ containing no
+private records. Clients never transmit explanations, gradients on private
+data, or raw features.
+
+\subsection{Trust Computation}
+Let $u_k = \theta_k - \theta_g$ be client $k$'s update and
+$\tilde{u} = \mathrm{median}_k(u_k)$ the coordinate-wise median update. Two
+similarity terms are computed. The update-similarity term is the cosine
+similarity to the median update, attenuated by a magnitude penalty that
+detects norm inflation:
+\begin{equation}
+ s^{\mathrm{upd}}_k = \max\!\left(0, \frac{u_k^{\top}\tilde{u}}
+ {\lVert u_k\rVert\,\lVert \tilde{u}\rVert}\right)
+ \cdot \min\!\left(1, \frac{\mathrm{median}_j \lVert u_j \rVert}
+ {\lVert u_k \rVert}\right).
+ \label{eq:supd}
+\end{equation}
+The explanation-consistency term compares attribution signatures (Section
+\ref{sec:expltrust}):
+\begin{equation}
+ s^{\mathrm{exp}}_k = \max\!\left(0, \frac{\phi_k^{\top}\tilde{\phi}}
+ {\lVert \phi_k\rVert\,\lVert \tilde{\phi}\rVert}\right),
+ \qquad \tilde{\phi} = \mathrm{median}_k(\phi_k).
+ \label{eq:sexp}
+\end{equation}
+The two are mixed by $\alpha$ and smoothed by an exponential moving average
+with memory $\beta$:
+\begin{equation}
+ T_k(t) = \beta\,T_k(t-1) + (1-\beta)\left[\alpha s^{\mathrm{upd}}_k
+ + (1-\alpha) s^{\mathrm{exp}}_k\right].
+ \label{eq:trust}
+\end{equation}
+Thus $\alpha=1$ reduces trust to update geometry alone and $\alpha=0$ to
+explanation consistency alone.
+
+\subsection{Trust-Aware Aggregation}
+Aggregation weights sharpen trust by an exponent $\gamma$ and exclude clients
+below a threshold $\tau$:
+\begin{equation}
+ p_k = \frac{n_k \, \hat{T}_k^{\gamma}}{\sum_{j} n_j \hat{T}_j^{\gamma}},
+ \qquad
+ \hat{T}_k = \begin{cases} T_k, & T_k \geq \tau\\ 0, & T_k < \tau
+ \end{cases}
+ \label{eq:weights}
+\end{equation}
+with $\theta_g^{(t+1)} = \sum_k p_k \theta_k^{(t)}$. If every client falls
+below $\tau$, the scheme falls back to uniform weighting rather than
+producing an undefined update. Setting $T_k$ constant recovers
+(\ref{eq:fedavg}).
+
+\subsection{Explanation-Based Trust}
+\label{sec:expltrust}
+For a linear model, the exact SHAP value of feature $j$ at input
+$\mathbf{x}$ in log-odds space is
+\begin{equation}
+ \varphi_j(\mathbf{x}) = w_j\left(x_j - \mathbb{E}[x_j]\right).
+ \label{eq:shap}
+\end{equation}
+Aggregating over the shared reference set gives a per-client
+\emph{signature}, an $L_2$-normalised signed vector,
+\begin{equation}
+ \phi_k = \frac{\mathbf{w}_k \odot \mathrm{sd}(X_{\mathrm{ref}})}
+ {\lVert \mathbf{w}_k \odot \mathrm{sd}(X_{\mathrm{ref}})\rVert}.
+ \label{eq:signature}
+\end{equation}
+The signature is signed rather than absolute, so a label-flipped model, whose
+attributions point the wrong way, is anomalous even when its magnitude
+profile is ordinary. Crucially, $\phi_k$ is computed by the server from the
+submitted $\theta_k$, so a malicious client cannot report a favourable
+explanation.
+
+\subsection{$\kappa$ Extrapolation}
+Early in training, individual updates are small and their signatures are
+dominated by the shared global model, which compresses the difference
+between honest and malicious clients. The server therefore extrapolates each
+client's update before taking the signature:
+\begin{equation}
+ \theta_k^{\kappa} = \theta_g + \kappa\,(\theta_k - \theta_g),
+ \qquad
+ \phi_k = \mathrm{sig}\!\left(\theta_k^{\kappa}, X_{\mathrm{ref}}\right).
+ \label{eq:kappa}
+\end{equation}
+This amplifies the direction in which a client is pushing the model without
+altering the aggregation itself. Detection quality is quantified by the
+\emph{detection margin}
+\begin{equation}
+ \Delta = \min_{k \notin \mathcal{M}} T_k - \max_{k \in \mathcal{M}} T_k,
+ \label{eq:margin}
+\end{equation}
+which is positive only when every honest client is trusted more than every
+attacker.
+
+\subsection{SHAP Explainability}
+Equation (\ref{eq:shap}) provides per-patient attributions at no
+approximation cost. The application renders them twice: as a signed bar chart
+over all features, and as a ranked plain-language summary that separates
+factors increasing from factors decreasing the predicted risk, annotated with
+the patient's own feature values in clinical units.
+
+\subsection{Prediction and Graphical Interface}
+A PyQt6 desktop application exposes federated training configuration, live
+per-round trust diagnostics, model evaluation, per-patient explanation and
+tabular reporting. Personalization here is at the level of the individual
+patient record: the same global model is applied to every patient, but both
+the risk estimate and the attribution breakdown are computed from that
+patient's own feature vector, so two patients with the same predicted risk
+may receive entirely different explanations. Predictions are presented as calibrated probabilities with
+an explicit statement that they are risk estimates rather than diagnoses.
+
+\section{Experimental Setup}
+
+\subsection{Datasets}
+Five binary-outcome tabular clinical tasks are used
+(Table~\ref{tab:datasets}). The Breast Cancer Wisconsin (Diagnostic) data are
+the real measurements distributed with scikit-learn. For the remaining four tasks, the repository supports
+loading the corresponding public CSV files; when those files are
+absent---as in the runs reported here---the framework generates a
+calibrated synthetic cohort with realistic marginal distributions,
+correlations and outcome prevalence. All reported results for those four
+tasks are therefore obtained on synthetic data, and this is a limitation
+rather than a claim of clinical validity (Section~\ref{sec:limits}).
+
+\begin{table}[t]
+ \caption{Datasets used in the experiments}
+ \label{tab:datasets}
+ \centering
+ \small
+ \setlength{\tabcolsep}{3.5pt}
+ \begin{tabular}{lrrrl}
+ \toprule
+ Dataset & $n$ & Feat. & Pos. & Source \\
+ \midrule
+ Heart Disease & 1500 & 13 & 52.6\% & Synthetic \\
+ Pima Diabetes & 1500 & 8 & 33.9\% & Synthetic \\
+ Breast Cancer Wisc. & 569 & 10 & 37.3\% & Real (sklearn) \\
+ Framingham CHD & 2000 & 14 & 15.0\% & Synthetic \\
+ Stroke Prediction & 2500 & 10 & 9.8\% & Synthetic \\
+ \bottomrule
+ \end{tabular}
+\end{table}
+
+\subsection{Preprocessing and Missing Values}
+Each dataset is split 75/25 into training and test partitions, stratified by
+outcome. Features are standardised to zero mean and unit variance using
+training-set statistics only, and the same statistics are applied to the test
+partition and to any patient entered through the interface. For datasets
+loaded from real CSV files, physiologically impossible zero entries in the
+Pima data are treated as missing and imputed with the column median, and
+categorical fields in the stroke data are integer-encoded; rows with residual
+missing values are dropped. The synthetic generators do not produce missing
+values.
+
+\subsection{Federated Configuration}
+Table~\ref{tab:config} lists the configuration used for all reported
+experiments. The public reference set for attribution signatures contains
+$\min(200, |X_{\mathrm{test}}|)$ samples drawn from the test pool; in a
+deployment this would be a synthetic or public cohort rather than patient
+records.
+
+\begin{table}[t]
+ \caption{Experimental configuration}
+ \label{tab:config}
+ \centering
+ \small
+ \begin{tabular}{ll}
+ \toprule
+ Parameter & Value \\
+ \midrule
+ Clients (hospitals) $K$ & 6 (experiments); 5 (interface default) \\
+ Federated rounds & 30 \\
+ Local epochs / round & 3 \\
+ Learning rate, batch, $L_2$ & 0.15, 32, $10^{-3}$ \\
+ Model & Logistic regression, mini-batch SGD \\
+ Partition & Dirichlet, $\alpha_{\mathrm{nIID}}=0.5$ \\
+ Train/test split & 75\% / 25\%, stratified \\
+ Trust weighting $\alpha$ & 0.0 (final, from E6) \\
+ Extrapolation $\kappa$ & 4.0 \\
+ EMA memory $\beta$ & 0.6 \\
+ Weight exponent $\gamma$ & 2.0 \\
+ Exclusion threshold $\tau$ & 0.25 \\
+ Seeds & 42, 43, 44 \\
+ Framework & Flower \\
+ \bottomrule
+ \end{tabular}
+\end{table}
+
+\subsection{Attacks, Baselines and Metrics}
+Malicious clients are assigned by index so that the attacked configuration is
+identical across strategies and seeds: one attacker is client~2 (label
+flipping); two attackers add client~4 (noise); three attackers add client~1
+(scaled poisoning). Trust-weighted aggregation is compared against FedAvg
+(\ref{eq:fedavg}) and the coordinate-wise median.
+Performance is reported as test-set ROC-AUC of the final global model,
+averaged over three seeds with standard deviation; robustness of detection is
+reported as the margin $\Delta$ in (\ref{eq:margin}).
+
+\subsection{Selection of $\alpha$ and $\kappa$}
+$\kappa$ was selected from the sweep in Section~\ref{sec:e3} and $\alpha$
+from the sweep in Section~\ref{sec:e6}. Neither was tuned on a separate
+criterion, and no other hyperparameter was adjusted while these sweeps were
+performed.
+
+\section{Results and Discussion}
+
+Unless stated otherwise, results use the Heart Disease task with $K=6$,
+30 rounds, and three seeds; means are reported with standard deviation.
+Sections~\ref{sec:e1}, \ref{sec:e3} and \ref{sec:e5} use the final
+$\alpha=0$ configuration.
+
+\subsection{E1: Malicious-Client Fraction}
+\label{sec:e1}
+Table~\ref{tab:e1} and Fig.~\ref{fig:e1} report final AUC as the fraction of
+malicious clients increases. With no attacker, all three aggregation rules
+are equivalent, as expected: trust weighting does not help when there is
+nothing to defend against. The strategies separate once attackers are
+present. At two of six malicious clients, FedAvg falls to
+$0.769 \pm 0.067$ while trust weighting holds $0.810 \pm 0.018$; the
+increased standard deviation of FedAvg indicates that the damage depends
+strongly on the particular partition. The coordinate-wise median remains
+competitive throughout, which is consistent with its design: it is a robust
+estimator, and the attacks used here are not tailored to defeat it.
+
+\begin{table}[t]
+ \caption{E1: final AUC vs.\ malicious fraction (mean $\pm$ sd, 3 seeds)}
+ \label{tab:e1}
+ \centering
+ \small
+ \begin{tabular}{lccc}
+ \toprule
+ Malicious & Trust-Aware & FedAvg & Median \\
+ \midrule
+ 0/6 & $0.808 \pm 0.015$ & $0.808 \pm 0.014$ & $0.807 \pm 0.018$ \\
+ 1/6 & $\mathbf{0.807 \pm 0.016}$ & $0.806 \pm 0.015$ & $0.796 \pm 0.019$ \\
+ 2/6 & $\mathbf{0.810 \pm 0.018}$ & $0.769 \pm 0.067$ & $0.802 \pm 0.013$ \\
+ 3/6 & $\mathbf{0.806 \pm 0.020}$ & $0.775 \pm 0.059$ & $0.789 \pm 0.036$ \\
+ \bottomrule
+ \end{tabular}
+\end{table}
+
+\begin{figure}[t]
+ \centering
+ \includegraphics[width=\columnwidth]{e1_robustness.png}
+ \caption{E1: robustness to increasing attack fraction, $\alpha=0$.}
+ \label{fig:e1}
+\end{figure}
+
+\subsection{E2: Trust-Component Ablation}
+\label{sec:e2}
+Table~\ref{tab:e2} isolates the two trust signals at two of six malicious
+clients. Using update similarity alone ($\alpha=1$) yields a \emph{negative}
+margin, $-0.095 \pm 0.127$: at least one attacker is trusted more than at
+least one honest client, so the ordering is not usable for exclusion. Adding
+explanation consistency reverses this, and using explanation consistency
+alone gives the largest margin, $+0.513 \pm 0.296$. AUC differences among the
+three settings are small relative to seed variance. This experiment sets
+$\alpha$ explicitly and is therefore unaffected by the choice of default.
+
+\begin{table}[t]
+ \caption{E2: trust-component ablation, 2/6 malicious (3 seeds)}
+ \label{tab:e2}
+ \centering
+ \small
+ \begin{tabular}{lcc}
+ \toprule
+ Trust signal & AUC & Detection margin $\Delta$ \\
+ \midrule
+ Update only ($\alpha=1$) & $0.800 \pm 0.017$ & $-0.095 \pm 0.127$ \\
+ Both ($\alpha=0.5$) & $0.805 \pm 0.013$ & $+0.243 \pm 0.111$ \\
+ Explanation only ($\alpha=0$) & $\mathbf{0.810 \pm 0.018}$ &
+ $\mathbf{+0.513 \pm 0.296}$ \\
+ \bottomrule
+ \end{tabular}
+\end{table}
+
+\begin{figure}[t]
+ \centering
+ \includegraphics[width=\columnwidth]{e2_ablation.png}
+ \caption{E2: contribution of the two trust signals.}
+ \label{fig:e2}
+\end{figure}
+
+\subsection{E3: Extrapolation Sensitivity}
+\label{sec:e3}
+Table~\ref{tab:e3} and Fig.~\ref{fig:e3} sweep $\kappa$ with a single
+label-flipping client. Without meaningful extrapolation ($\kappa=1$) the
+margin is $+0.066 \pm 0.048$, close to the point at which honest and
+malicious clients are indistinguishable. The margin peaks at $\kappa=4$
+($+0.807 \pm 0.080$) and declines for larger values, where extrapolation
+begins to amplify noise as well as signal. This supports the central claim
+that amplifying the update direction, rather than inspecting the raw update,
+is what exposes inverted attribution. Note that $\kappa$ affects only trust
+scoring; the aggregation in (\ref{eq:weights}) uses unmodified parameters.
+
+\begin{table}[t]
+ \caption{E3: detection margin vs.\ $\kappa$, one label flipper (3 seeds)}
+ \label{tab:e3}
+ \centering
+ \small
+ \begin{tabular}{lc}
+ \toprule
+ Extrapolation $\kappa$ & Detection margin $\Delta$ \\
+ \midrule
+ 1 & $+0.066 \pm 0.048$ \\
+ 2 & $+0.674 \pm 0.399$ \\
+ 4 & $\mathbf{+0.807 \pm 0.080}$ \\
+ 8 & $+0.495 \pm 0.190$ \\
+ 16 & $+0.139 \pm 0.073$ \\
+ \bottomrule
+ \end{tabular}
+\end{table}
+
+\begin{figure}[t]
+ \centering
+ \includegraphics[width=\columnwidth]{e3_kappa.png}
+ \caption{E3: detection margin as a function of $\kappa$, $\alpha=0$.}
+ \label{fig:e3}
+\end{figure}
+
+\subsection{E4: Heterogeneity False Positives}
+\label{sec:e4}
+A robustness mechanism is only usable if it does not penalise honest
+institutions whose patient populations differ. E4 runs with \emph{no}
+attackers and varies $\alpha_{\mathrm{nIID}}$, recording the minimum trust
+assigned to any honest client (Table~\ref{tab:e4}). Across the range tested,
+the minimum honest trust remains between $0.384$ and $0.456$, above the
+exclusion threshold $\tau = 0.25$, so no honest client is excluded even at
+$\alpha_{\mathrm{nIID}} = 0.1$. These values were measured under the earlier
+$\alpha = 0.5$ configuration and have not been re-measured at $\alpha = 0$;
+they should therefore be read as evidence for the mixed-signal setting.
+
+\begin{table}[t]
+ \caption{E4: minimum honest-client trust, no attackers (3 seeds)}
+ \label{tab:e4}
+ \centering
+ \small
+ \begin{tabular}{lc}
+ \toprule
+ Dirichlet $\alpha_{\mathrm{nIID}}$ & Min.\ honest trust \\
+ \midrule
+ 0.1 & $0.432 \pm 0.023$ \\
+ 0.5 & $0.411 \pm 0.025$ \\
+ 1.0 & $0.384 \pm 0.065$ \\
+ 5.0 & $0.456 \pm 0.013$ \\
+ \bottomrule
+ \end{tabular}
+\end{table}
+
+\subsection{E5: Cross-Dataset Generalisation}
+\label{sec:e5}
+Table~\ref{tab:e5} repeats the two-of-six attack configuration on all five
+tasks. Trust weighting attains the highest or joint-highest AUC on every
+dataset. The largest gap appears on Breast Cancer Wisconsin, where FedAvg
+collapses to $0.657$: the label-flipping client inverts a model that is
+otherwise highly separable, and sample-size weighting propagates that
+inversion. Detection margins are positive on all five tasks, though smallest
+on Stroke Prediction ($+0.199$), the most imbalanced task, where honest
+clients disagree most and the explanation signal is correspondingly weaker.
+
+\begin{table}[t]
+ \caption{E5: cross-dataset AUC and detection margin, 2/6 malicious}
+ \label{tab:e5}
+ \centering
+ \small
+ \begin{tabular}{lcccc}
+ \toprule
+ Dataset & Trust & FedAvg & Median & $\Delta$ \\
+ \midrule
+ Heart Disease & $\mathbf{0.810}$ & 0.769 & 0.802 & $+0.513$ \\
+ Pima Diabetes & $\mathbf{0.895}$ & 0.874 & 0.891 & $+0.688$ \\
+ Breast Cancer Wisc. & $\mathbf{0.977}$ & 0.657 & $\mathbf{0.977}$ &
+ $+0.707$ \\
+ Framingham CHD & $\mathbf{0.796}$ & 0.720 & 0.785 & $+0.484$ \\
+ Stroke Prediction & $\mathbf{0.909}$ & 0.828 & 0.891 & $+0.199$ \\
+ \bottomrule
+ \end{tabular}
+\end{table}
+
+\begin{figure}[t]
+ \centering
+ \includegraphics[width=\columnwidth]{e5_datasets.png}
+ \caption{E5: cross-dataset robustness and honest/attacker separation.}
+ \label{fig:e5}
+\end{figure}
+
+\subsection{E6: Sensitivity to the Trust Weighting $\alpha$}
+\label{sec:e6}
+Table~\ref{tab:e6} and Fig.~\ref{fig:e6} sweep $\alpha$ over
+$\{0, 0.25, 0.5, 0.75, 1\}$ under the E2 protocol: same dataset, attack
+configuration, partitions, seeds, $\kappa$ and evaluation, with $\alpha$ the
+only variable.
+
+Three observations follow. First, the detection margin decreases
+monotonically as the update-similarity contribution grows, from
+$+0.514 \pm 0.296$ at $\alpha=0$ to $-0.095 \pm 0.127$ at $\alpha=1$, where
+separation is lost entirely. Second, AUC varies comparatively little across
+the sweep---from $0.800$ to $0.810$, a range of the same order as the
+per-seed standard deviation---so AUC alone does not discriminate strongly
+between settings. Third, $\alpha=0$ attains both the largest margin and the
+highest mean AUC in this experimental environment.
+
+$\alpha=0$ was therefore adopted for the final configuration \emph{primarily
+on the basis of malicious-client separation}. This should not be read as a
+claim that $\alpha=0$ is universally optimal. The result is specific to these
+datasets, this attack set, this model family and this partitioning; the
+update-similarity term retains a clear purpose against attacks that preserve
+attribution structure while inflating magnitude, and a different attack
+mixture could favour a non-zero $\alpha$. What the sweep does establish is
+that, here, explanation consistency carries the discriminative signal and
+adding update similarity dilutes it.
+
+\begin{table}[t]
+ \caption{E6: sensitivity to trust weighting $\alpha$, 2/6 malicious
+ (3 seeds)}
+ \label{tab:e6}
+ \centering
+ \small
+ \begin{tabular}{lcc}
+ \toprule
+ $\alpha$ & AUC & Detection margin $\Delta$ \\
+ \midrule
+ 0.00 & $\mathbf{0.810 \pm 0.018}$ & $\mathbf{+0.514 \pm 0.296}$ \\
+ 0.25 & $0.810 \pm 0.018$ & $+0.413 \pm 0.187$ \\
+ 0.50 & $0.805 \pm 0.013$ & $+0.243 \pm 0.111$ \\
+ 0.75 & $0.805 \pm 0.014$ & $+0.061 \pm 0.111$ \\
+ 1.00 & $0.800 \pm 0.017$ & $-0.095 \pm 0.127$ \\
+ \bottomrule
+ \end{tabular}
+\end{table}
+
+\begin{figure}[t]
+ \centering
+ \includegraphics[width=\columnwidth]{e6_alpha.png}
+ \caption{E6: $\alpha$ against AUC (left) and detection margin (right).}
+ \label{fig:e6}
+\end{figure}
+
+\section{Explainability and Graphical Interface}
+
+The application presents the prediction before any explanation. For a
+selected patient it reports a risk category and the estimated probability,
+followed by a ranked breakdown of the factors that increased and decreased
+that estimate, each annotated with the patient's own value in clinical units
+and a qualitative strength. A plain-language summary names the strongest
+contributor on each side. Below this, the technical view shows the signed
+SHAP attribution over all features (Fig.~\ref{fig:shap}), with the axis
+labelled as impact on the prediction rather than as a clinical effect.
+
+\begin{figure}[t]
+ \centering
+ \includegraphics[width=\columnwidth]{shap_example.png}
+ \caption{Per-patient attribution from (\ref{eq:shap}) for one test patient.
+ Positive values increase the predicted risk. Illustrative example produced
+ by the project's explainability module on the synthetic Heart Disease
+ cohort.}
+ \label{fig:shap}
+\end{figure}
+
+Categorical inputs are presented by name rather than by code---sex as
+female/male, chest pain type, resting ECG, ST slope and thalassemia by their
+category labels---while the numeric code required by the model is retained
+internally, so the vector reaching the model is unchanged. The same interface
+can explain either a held-out test patient or the patient just entered on the
+prediction screen; in the latter case the explanation and the prediction
+refer to the same input by construction.
+
+The reporting screen presents model performance, attack robustness,
+per-client trust decomposition, the E1--E6 summary and cross-dataset results
+as tables, reading from the stored experiment outputs rather than recomputing
+them, and supports CSV export.
+
+Two framing decisions are deliberate. Attributions are described as
+contributions of features to the model's output, not as causal or clinical
+statements, following the caution urged in the explainability literature. Every prediction view carries an explicit
+notice that the output is an AI-generated risk estimate and not a medical
+diagnosis.
+
+\section{Limitations}
+\label{sec:limits}
+
+The following limitations bound the claims made here.
+
+\emph{Simulated federation.} All hospitals are simulated processes on one
+machine. Real deployments face stragglers, dropout, heterogeneous compute and
+communication failures, none of which are modelled. They also face governance
+questions---consent, liability, auditability and data stewardship across
+institutions---that a technical mechanism does not resolve
+\cite{eden2025governance}.
+
+\emph{Data provenance.} Only the Breast Cancer Wisconsin task uses real
+measurements in the reported runs. The other four use calibrated synthetic
+cohorts, which reproduce plausible marginals and correlations but not the
+messiness, coding drift or site-specific bias of hospital records. Results on
+those four tasks characterise the method's behaviour, not clinical
+performance.
+
+\emph{Dataset scale.} Cohorts of 569--2500 records split across six clients
+leave some shards small, which inflates seed-to-seed variance; several
+reported standard deviations are large relative to the differences discussed.
+
+\emph{Attack scope.} Three attack types are evaluated. Adaptive adversaries
+that optimise against the trust rule itself---for example, by matching the
+cohort attribution signature while poisoning slowly---are not evaluated, and
+ shows such attacks are practical against robust aggregators.
+
+\emph{Explanation fidelity.} Exact SHAP values are available only because
+the model is linear. The signature in (\ref{eq:signature}) summarises a model
+by its weight profile on a reference set, so two models with different
+behaviour but similar weight direction would be scored alike. SHAP values
+also describe association within the model, not causation.
+
+\emph{No clinical validation.} The system has not been evaluated
+prospectively, on real patient cohorts, or in any care setting; no clinical
+utility, safety or equity claim is made. Its outputs are risk estimates from
+a research prototype and must not be used for diagnosis or treatment
+decisions.
+
+\emph{Environment sensitivity.} Absolute values depend on the numerical
+environment: the split implementation and metric library affect partitioning
+and hence results. All figures reported here come from a single consistent
+environment and configuration.
+
+\section{Conclusion and Future Work}
+
+This paper presented TA-EFL, a federated learning framework in which
+explanation consistency is used as a trust signal rather than only as an
+output. By recomputing an extrapolated attribution signature server-side from
+each submitted parameter vector, the method detects clients whose models
+attribute risk in the wrong direction without requiring clients to report
+anything beyond parameters. Across six experiments, trust-weighted
+aggregation preserved AUC under attack where FedAvg degraded, extrapolation
+at $\kappa=4$ produced the strongest honest/attacker separation, and no
+honest client was excluded under the heterogeneity levels tested. A
+sensitivity sweep led to $\alpha=0$ for this configuration, selected on
+separation rather than on accuracy, and reported as configuration-specific
+rather than universal.
+
+Future work follows directly from the limitations. The most important step is
+evaluation on real multi-institutional data with a clinical partner. Beyond
+that: adaptive attacks that target the attribution signature itself; non-linear
+models, where exact SHAP is unavailable and approximate attributions would
+introduce their own error; formal privacy guarantees for the reference set and
+the signatures, given known gradient-leakage risks;
+re-measurement of E4 under the final configuration; and calibration analysis,
+since a risk score intended to inform clinicians must be well calibrated and
+not merely well ranked.
+
+\section*{Reproducibility}
+
+All experiments are reproducible from the accompanying repository with fixed
+seeds $\{42,43,44\}$. Experiments E1, E3 and E5 in the final configuration
+are produced by \texttt{run\_study.py --only e1,e3,e5 --label final\_alpha0};
+E2 and E4 by \texttt{run\_study.py}; E6 by
+\texttt{run\_study.py --only e6}. Per-seed values are stored as CSV files
+alongside the figures reproduced in this paper.
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\end{document}
