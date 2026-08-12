@@ -32,6 +32,9 @@ paper/overleaf/*.blg
 paper/overleaf/*.bbl
 paper/overleaf/*.out
 
+# Extracted copy of paper/ta_efl_paper_latex.zip -- duplicates paper/overleaf/
+paper/ta_efl_paper_latex/
+
 # --- Office / OS ------------------------------------------------------------
 *.lnk
 ~$*.docx
