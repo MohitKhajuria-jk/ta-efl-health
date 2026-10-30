@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.0 — Web workspace and hospital-specific calibration (October 2026)
+
+* **Web research workspace:** React + TypeScript frontend served by a FastAPI backend (`api/`, `web/`),
+  reusing the Python/Flower research engine. `main.py` starts the web application; the PyQt6 desktop
+  application remains available through `desktop.py`.
+* Pages for overview, federated learning, hospital network, trust monitoring, risk prediction,
+  hospital calibration, research analytics, dataset library, experiment history (PDF/HTML/JSON
+  reports) and settings, with light and dark themes.
+* **Hospital-specific personalisation (optional):** the trust-aware global model stays frozen and each
+  simulated hospital fits a two-parameter probability calibrator on its own data
+  (`ml/personalization/`, `federated/personalized_runner.py`, `scripts/run_personalization.py`), with a
+  personalised mode on the risk-prediction page. See `docs/PERSONALIZATION.md`.
+* Local accounts with HttpOnly session cookies, CSRF protection, rate limits and an offline
+  password-reset tool (`scripts/reset_password.py`).
+* 36 new Python tests and 2 new browser tests (Python suite: 202 tests; Playwright suite: 16 tests).
+* New documentation: `WEB_ARCHITECTURE.md`, `API.md`, `PERSONALIZATION.md`, `VERIFICATION.md`,
+  `SECURITY.md`, `DESIGN_SOURCES.md`.
+* Repository: dataset CSV files are no longer committed (download them with
+  `scripts/fetch_datasets.py`); experiment storage stays local.
+
 ## v2.3 — GUI visibility fixes
 
 * **Login button invisible:** the login pane used an unscoped stylesheet (`background: white`),

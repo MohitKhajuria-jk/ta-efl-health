@@ -2,166 +2,198 @@
 
 **Trust-Aware Explainable Federated Learning for Personalized Healthcare Risk Prediction**
 
-A React research workspace backed by the original Python engine. Train a genuine Flower simulation, inspect client trust, predict with saved models, compute real SHAP explanations, and explore preserved experiment history.
+![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![Flower 1.26](https://img.shields.io/badge/Flower-1.26-F2B705)
+![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)
+![React + TypeScript](https://img.shields.io/badge/React-TypeScript-3178C6?logo=react&logoColor=white)
+![Status: research prototype](https://img.shields.io/badge/status-research%20prototype-lightgrey)
 
-This is a single-process research simulation. Model probabilities are not clinically calibrated risks or diagnoses. It does not deploy hospital servers or provide differential privacy or secure aggregation.
+TA-EFL Health is a research system for training clinical risk models across several hospitals without moving patient records. It runs genuine [Flower](https://flower.ai) federated learning, protects the shared model with a **trust-aware aggregation rule**, explains every prediction with **SHAP**, and lets each hospital **recalibrate** the frozen global model for its own patients. A React web workspace on top of the Python engine makes every step visible: configuring runs, watching trust change round by round, comparing experiments and inspecting explained predictions.
 
-## Start the application
+![Research overview dashboard](docs/images/overview.png)
 
-Requirements: Windows, Python 3.12 (64-bit), Node.js 22.12+ or a compatible newer LTS. The implementation was verified with Python 3.12.10 and Node 24.18.0.
+> **Research prototype.** All hospitals run as an in-process simulation on one machine. Model outputs are research estimates, not diagnoses or clinically validated risks.
 
-From this project folder, in PowerShell:
+## Contents
+
+- [Key features](#key-features)
+- [Results at a glance](#results-at-a-glance)
+- [Screenshots](#screenshots)
+- [Getting started](#getting-started)
+- [Reproducing the experiments](#reproducing-the-experiments)
+- [Testing](#testing)
+- [Project structure](#project-structure)
+- [Documentation](#documentation)
+- [Scope and limitations](#scope-and-limitations)
+- [Team](#team)
+
+## Key features
+
+- **Federated learning with Flower 1.26.** Five simulated hospitals train a logistic regression model locally; the server aggregates with FedAvg, the coordinate-wise median, or the trust-aware rule. Four attacks (sign flipping, update scaling, Gaussian noise, label flipping) can be assigned to any hospital.
+- **Trust-aware aggregation.** Every round the server scores each hospital from two measurements it makes itself: validation ROC-AUC relative to the median hospital, and cosine agreement with the coordinate-wise median update. Trust is smoothed across rounds; hospitals below the threshold are excluded and the rest are weighted by trust × data size. Every score and weight is logged for audit.
+- **Leakage-safe federated preprocessing.** Hospitals share only summary statistics; the server rebuilds exactly the transform that pooled training data would produce. Validation and test rows are never used for fitting.
+- **Explanations.** Exact SHAP contributions (log-odds) for every prediction, with additivity checked in tests.
+- **Hospital-specific calibration.** An optional step fits `P = sigmoid(a·z + b)` on each hospital's own calibration rows, leaving the global model untouched and the within-hospital ranking unchanged. See [docs/PERSONALIZATION.md](docs/PERSONALIZATION.md).
+- **Web workspace.** Overview, federated learning, hospital network, trust monitoring, risk prediction, hospital calibration, research analytics, dataset library, experiment history (PDF/HTML/JSON reports) and settings, with light and dark themes.
+- **Reproducibility.** Every experiment is saved with its full configuration, dataset SHA-256 fingerprint, split sizes and per-round trust table.
+
+## Results at a glance
+
+Five public datasets, three strategies, four attacks plus a no-attack baseline, seeds 1–3 (225 federated runs). Five IID hospitals, 30 rounds, hospital 5 attacking. Test ROC-AUC, mean of three seeds:
+
+| Attack | Dataset | FedAvg | FedMedian | Trust-aware |
+|---|---|---:|---:|---:|
+| None | Heart failure | 0.902 | 0.902 | 0.902 |
+| Sign flipping | Heart failure | 0.790 | 0.900 | 0.891 |
+| Sign flipping | Stroke | 0.599 | 0.808 | 0.784 |
+| Gaussian noise | Heart failure | 0.607 | 0.902 | 0.888 |
+| Gaussian noise | Diabetes | 0.494 | 0.811 | 0.780 |
+
+- The trust-aware rule recovered most of the accuracy FedAvg lost and never gave an honest hospital zero weight (0 of 9,450 honest hospital-rounds).
+- The coordinate-wise median matched or slightly exceeded it under sign flipping and Gaussian noise; the trust rule's distinctive value is a per-hospital, per-round audit trail.
+- Under strong label skew (Dirichlet α = 0.5), hospital calibration lowered the Brier score and ECE on all five datasets; only 21 of 45 simulated hospitals had enough local data to be calibrated.
+
+Full tables: [docs/RESULTS.md](docs/RESULTS.md) and [docs/PERSONALIZATION.md](docs/PERSONALIZATION.md).
+
+## Screenshots
+
+| Federated learning: configuration, live monitor and per-hospital trust | Risk prediction with SHAP explanation |
+|---|---|
+| ![Federated learning page](docs/images/federated-learning.png) | ![Risk prediction page](docs/images/risk-prediction.png) |
+
+All screenshots are captures of the running application.
+
+## Getting started
+
+**Requirements:** Windows 10/11, Python 3.12 (64-bit), Node.js 22.12 or newer. Tested with Python 3.12.10 and Node 24.18.0.
 
 ```powershell
-# If needed: py -3.12 -m venv .venv
+git clone https://github.com/MohitKhajuria-jk/ta-efl-health.git
+cd ta-efl-health
+
+# Python environment
+py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-web.txt
+
+# Datasets (see "Datasets" below)
+.\.venv\Scripts\python.exe scripts\fetch_datasets.py
+.\.venv\Scripts\python.exe scripts\check_datasets.py
+
+# Web frontend
 cd web
 npm.cmd ci
 npm.cmd run build
 cd ..
+
+# Start
 .\.venv\Scripts\python.exe main.py
 ```
 
-Open **http://127.0.0.1:8780**. FastAPI serves both the production frontend and API. Sign in with the existing local account. Registration appears only when the configured account store is empty. No default password or production demo account is introduced. The dedicated port avoids an older backend on port 8000 that does not implement this frontend's authentication routes.
+Open **http://127.0.0.1:8780**. On first start the workspace asks you to create a local account. To use another port, set `$env:TA_EFL_PORT='8783'` before starting. Forgotten passwords can be reset locally with `scripts\reset_password.py YOUR_USERNAME`.
 
-For reproducible Python installation, `requirements-lock.txt` records the exact tested environment. `requirements-web.txt` describes supported direct dependencies; `web/package-lock.json` pins the JavaScript dependency tree.
+For frontend development, keep the backend running and start Vite in `web/` with `npm.cmd run dev` (http://127.0.0.1:5173, proxied to the API). `requirements-lock.txt` records the exact tested Python environment and `web/package-lock.json` pins the JavaScript dependencies.
 
-If you forget a local account password, run the recovery tool in an interactive PowerShell terminal:
+### Datasets
 
-```powershell
-.\.venv\Scripts\python.exe scripts/reset_password.py YOUR_USERNAME
-```
+Dataset files are **not** included in this repository; download them once with `scripts\fetch_datasets.py` (Pima diabetes is fetched automatically and SHA-256 verified; the Kaggle datasets use the Kaggle CLI if configured, otherwise exact manual steps are printed). Breast cancer ships with scikit-learn. Every file is validated against its schema before use.
 
-Enter the new password twice; input stays hidden. The tool backs up the account store and updates only that account. Restart the Python server to sign out previous sessions, then sign in again. Research data and other accounts are retained. The tool honors `TA_EFL_SETTINGS` or an explicit `--settings` file and is not exposed over HTTP.
+| Dataset | Records | Positive | Features | Source |
+|---|---:|---:|---:|---|
+| Heart Failure Prediction | 918 | 508 | 11 | [Kaggle](https://www.kaggle.com/datasets/fedesoriano/heart-failure-prediction) |
+| Pima Indians Diabetes | 768 | 268 | 8 | UCI distribution (pinned mirror) |
+| Breast Cancer Wisconsin (Diagnostic) | 569 | 212 | 30 | scikit-learn |
+| Framingham CHD | 4,240 | 644 | 15 | [Kaggle](https://www.kaggle.com/datasets/aasheesh200/framingham-heart-study-dataset) |
+| Stroke Prediction | 5,110 | 249 | 10 | [Kaggle](https://www.kaggle.com/datasets/fedesoriano/stroke-prediction-dataset) |
 
-If port 8780 is occupied, select an unused port:
+Respect each dataset's licence and terms of use. Details: [data/README.md](data/README.md).
 
-```powershell
-$env:TA_EFL_PORT='8783'
-.\.venv\Scripts\python.exe main.py
-```
+## Reproducing the experiments
 
-## Frontend development
-
-Start the Python backend as above. In another PowerShell terminal:
-
-```powershell
-cd web
-npm.cmd run dev
-```
-
-Vite runs at **http://127.0.0.1:5173** and proxies `/api` to port 8780. Both processes must be running. For an alternate backend or frontend port, match the proxy target to the selected Python port:
+Experiment records, models and reports are written to `storage/` (not tracked by Git). A fresh clone therefore starts with an empty history; the published numbers are in [docs/RESULTS.md](docs/RESULTS.md).
 
 ```powershell
-$env:TA_EFL_API_TARGET='http://127.0.0.1:8783'
-npm.cmd run dev -- --port 5177
+# Robustness benchmark: all datasets x strategies x attacks x seeds 1-3
+.\.venv\Scripts\python.exe scripts\run_benchmarks.py
+# Optional: trust-only run with the original absolute performance signal
+.\.venv\Scripts\python.exe scripts\run_benchmarks.py --strategies trust --trust-mode absolute
+# Rebuild docs/RESULTS.md from the benchmark files on this machine
+.\.venv\Scripts\python.exe scripts\build_results.py
+
+# Hospital-calibration study on the frozen no-attack models of a benchmark
+.\.venv\Scripts\python.exe scripts\run_personalization.py --benchmark <benchmark-name>
+.\.venv\Scripts\python.exe scripts\run_personalization.py --benchmark <benchmark-name> --alpha 1.0
+.\.venv\Scripts\python.exe scripts\run_personalization.py --benchmark <benchmark-name> --partition iid
 ```
 
-Vite is a development server. For the production application, use `npm run build` and the Python server. A standalone Vite preview has no API proxy; it is not the full application.
+`<benchmark-name>` is the file name (without extension) written to `storage\benchmarks\` by `run_benchmarks.py`. Single experiments can also be run from the web workspace or with `run_experiment.py`.
 
-## Workflows
-
-- **Overview:** real dataset validation, preserved experiment count, latest saved metrics, validation history, and current job status.
-- **Federated learning:** choose dataset, strategy, client count, rounds, local training, seed, attacks and advanced trust parameters. Start one real simulation at a time. Cancellation takes effect at safe round boundaries.
-- **Hospital network:** inspect coordinator/client activity from engine callbacks; no simulated progress timers or remote-hospital claims.
-- **Trust monitoring:** saved per-client trust, validation AUC, performance/similarity signals, sample counts, validity and aggregation weights. Median correctly has no per-client weights.
-- **Risk prediction:** choose a saved current-pipeline model, enter schema-valid research features, compute a real prediction and SHAP contributions toward the positive class. Patient inputs and prediction outputs are not persisted.
-- **Research analytics:** held-out ROC curves, precision, recall, F1, confusion matrices, calibration metrics and compatible-run comparison.
-- **Dataset library:** source, licensing notes, verified counts, missing values, quality notes and feature schema. Existing local dataset import tools remain available.
-- **Experiment history:** search, dataset/strategy/attack filters, sort, pagination, record details and PDF/HTML/JSON report downloads.
-- **Settings:** Light, Dark and System appearance options; validated defaults for new web experiments, saved separately from original desktop settings; environment and research-scope information.
-
-Comparisons require the same dataset version, seed, test-split protocol, pipeline and decision threshold. Different seeds are not silently pooled. Historical metrics are labelled as saved results; no independent replication or confidence interval is invented.
-
-Use the sun/moon button on the login page, landing page or workspace header to switch between light and dark themes. **Settings → Appearance** also offers System, which follows the device preference. Appearance is saved in this browser, applied before the page paints, and synchronized between tabs. It stays separate from research configuration and account data.
-
-## Hospital-specific calibration (optional personalisation)
-
-An optional extension keeps the trust-aware global model **frozen** and fits, for each simulated hospital, a two-parameter local calibrator `P = sigmoid(a·z + b)` on global-model log-odds `z`, using only that hospital's own calibration rows. This is local probability calibration, not local fine-tuning or personalised feature learning; SHAP still explains the global model only. Hospitals are non-IID partitions of each saved model's held-out test split, each divided into disjoint calibration and test rows. Hospitals with fewer than 20 calibration rows, or fewer than 5 of either class, are reported as not calibrated.
-
-In the saved study (Dirichlet α = 0.5, seeds 1–3), calibration lowered Brier score and ECE on all five datasets, but only 21 of 45 hospitals had enough local data. Within-hospital ROC-AUC is unchanged by construction. With IID hospitals the gains were small and mixed. Full method, results and limitations: [docs/PERSONALIZATION.md](docs/PERSONALIZATION.md).
-
-```powershell
-.\.venv\Scripts\python.exe scripts/run_personalization.py
-```
-
-Results are stored separately in `storage/personalization/`. In the web app use **Hospital calibration** for study results and run history, and **Risk prediction → Prediction mode → Personalised** to compare global and hospital-calibrated probabilities.
-
-## Dataset inventory
-
-All five datasets passed the existing loader and schema checks in this workspace:
-
-| Dataset | Source | Rows | Positive rows | Features |
-|---|---|---:|---:|---:|
-| Heart Failure Prediction | Local `data/heart.csv` | 918 | 508 | 11 |
-| Pima Indians Diabetes | Local `data/diabetes.csv` | 768 | 268 | 8 |
-| Wisconsin Diagnostic Breast Cancer | Bundled in scikit-learn | 569 | 212 | 30 |
-| Framingham CHD | Local `data/framingham.csv` | 4,240 | 644 | 15 |
-| Stroke Prediction | Local `data/healthcare-dataset-stroke-data.csv` | 5,110 | 249 | 10 |
-
-Presence in this local folder does not grant redistribution rights. Dataset-specific provenance and licence notes remain in the registry and the web library. This project contains no BRFSS target; none is represented as a validated future-heart-attack prediction.
-
-```powershell
-.\.venv\Scripts\python.exe scripts/check_datasets.py
-```
-
-## Architecture and preservation
-
-```text
-web/src/                  React pages, typed client, accessible components, charts
-web/public/assets/        Local SVG artwork, genuine product-preview capture
-api/                      FastAPI contracts, sessions, research adapters, durable jobs
-federated/                Original Flower server/clients/strategies, event callbacks
-ml/                       Original datasets, preprocessing, models, prediction, SHAP
-experiments/              Original experiment store and sweep tools
-app/services/             Reused authentication and report implementation
-storage/experiments/      Existing and new research records
-storage/models/           Existing joblib models and metadata
-storage/web/              Web defaults, durable jobs, temporary exports
-main.py                   Primary web launcher
-desktop.py                Preserved optional desktop launcher
-```
-
-The original 576 experiment records and 576 model artifacts were retained. A SHA-256 manifest and pre-web ZIP backup were saved outside the project before editing, and Git baseline commit `c750d6b` preserves the original source. The ZIP excludes regenerable virtual-environment/cache folders but includes source, datasets, configuration, accounts and research artifacts; keep it private. `scripts/verify_preservation.py <manifest.json>` checks original data/storage/config files without rewriting them. Browser verification uses disposable copies under ignored `test-results/`, never the original account store.
-
-Preprocessing remains fitted only on client training statistics. Validation data informs trust and SHAP background; test data is used for final evaluation. The original algorithms were retained. The runner changes provide observational events, an explicit cancellation exception and a corrected module comment. `python desktop.py` retains the original PyQt6 interface if needed; [desktop documentation](docs/DESKTOP.md) is kept for reference.
-
-## Configuration and security
-
-The server reads the existing `config/settings.json`. `TA_EFL_SETTINGS` can select another local configuration file. Storage and dataset locations are configured locally, not accepted as API paths. Web defaults are stored separately at `storage/web/defaults.json`.
-
-Environment variables are documented in `.env.example`; set them in the process environment (the app does not automatically load dotenv files). Use one Uvicorn worker. A storage lock prevents multiple web API instances using the same storage. Avoid simultaneous desktop/CLI training because those original launchers do not acquire the web lock.
-
-Authentication reuses PBKDF2 local accounts. Opaque HttpOnly/SameSite cookies, CSRF verification, origin/Host restrictions, bounded requests, rate limits and safe artifact paths protect HTTP operations. Sessions expire after eight hours and reset on server restart. Logs contain structured request metadata, not submitted patient profiles or passwords. Accounts share the same local research workspace; enterprise roles are not implemented.
-
-For remote hosting, use an authenticated HTTPS reverse proxy, exact `TA_EFL_ALLOWED_HOSTS`, `TA_EFL_SECURE_COOKIES=1` and an appropriately controlled Python host. No public deployment was created. Sites/Cloudflare Worker hosting cannot run this local Python research engine.
-
-## Verification
+## Testing
 
 ```powershell
 $env:QT_QPA_PLATFORM='offscreen'
 $env:FLWR_TELEMETRY_ENABLED='0'
 .\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe -m pip check
+
 cd web
 npm.cmd run build
 npx.cmd playwright install chromium
 npm.cmd run test:e2e
-npm.cmd audit
 ```
 
-The browser suite starts a temporary production API on port 8781 with copied research artifacts and a test-only account. It shuts down that test server afterward. It needs the production frontend build, an installed Chromium, and access to create subprocesses. Set `QA_BROWSER` to an existing Chromium executable when appropriate. Test evidence and screenshots are in ignored `web/test-results/`; durable browser-test storage is under ignored root `test-results/`.
+The Python suite (202 tests on Windows) covers datasets and preprocessing, leakage, metrics, Flower messaging, attacks, every trust formula, FedAvg and FedMedian, SHAP additivity, calibration, the web API and the desktop interface. Dataset-specific tests are skipped until the CSV files are downloaded. The Playwright suite (16 tests) drives a real Chromium browser against a temporary server with disposable data and checks accessibility. Recorded outcomes: [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
-Exact outcomes, limitations and preservation results are recorded in [VERIFICATION.md](docs/VERIFICATION.md).
+## Project structure
 
-## Design and documentation
+```text
+api/            FastAPI application: routes, sessions, research adapters, background jobs
+federated/      Flower server runner, aggregation strategies, trust scoring, hospital clients, attacks
+ml/             datasets and schemas, preprocessing, logistic model, metrics, SHAP, personalisation
+experiments/    experiment store and parameter sweeps
+web/            React + TypeScript workspace (Vite, Tailwind, Recharts) and Playwright tests
+app/            shared services (accounts, reports) and the original PyQt6 desktop interface
+scripts/        dataset download/check, benchmarks, results builder, personalisation study, tools
+tests/          pytest suite
+docs/           architecture, API, results, personalisation, security and verification notes
+data/           dataset folder (CSV files are downloaded, not committed)
+main.py         starts the web application
+desktop.py      starts the legacy desktop application
+```
 
-- [Architecture, lifecycle and security](docs/WEB_ARCHITECTURE.md)
-- [API routes and contracts](docs/API.md); authenticated live OpenAPI at `/api/schema`
-- [Design resources and honest asset provenance](docs/DESIGN_SOURCES.md)
-- [Security controls and remaining dependency advisories](docs/SECURITY.md)
-- [Historical research results](docs/RESULTS.md)
+## Documentation
 
-The visual system uses navy, light analytical surfaces and restrained teal/mint accents, central CSS tokens with Tailwind v4 theme variables, locally bundled Manrope/DM Sans, Radix dialogs, Recharts, and verified Motion Primitives source. Haikei was accessed but export failed; original local SVG fallbacks are documented. Realtime Colors informed the locally defined palette; Godly redirected to Recent for art-direction research. Reduced-motion settings are respected. The landing-page product preview is a labelled screenshot of actual historical data, not live activity.
+| Document | Contents |
+|---|---|
+| [WEB_ARCHITECTURE.md](docs/WEB_ARCHITECTURE.md) | System architecture, job lifecycle and security model |
+| [API.md](docs/API.md) | HTTP routes and data contracts |
+| [RESULTS.md](docs/RESULTS.md) | Full robustness benchmark tables |
+| [PERSONALIZATION.md](docs/PERSONALIZATION.md) | Hospital-specific calibration: method, protocol and results |
+| [VERIFICATION.md](docs/VERIFICATION.md) | Test results, recomputation checks and reproducibility |
+| [SECURITY.md](docs/SECURITY.md) | Security controls and dependency advisories |
+| [DESKTOP.md](docs/DESKTOP.md) | The legacy PyQt6 desktop application |
+| [DESIGN_SOURCES.md](docs/DESIGN_SOURCES.md) | Design resources and asset provenance |
+| [CHANGELOG.md](docs/CHANGELOG.md) | Version history |
 
-Known limits: one workstation/one web simulation at a time; trusted local joblib artifacts; no distributed deployment, secure aggregation, differential privacy, clinical calibration, patient history, enterprise identity, or automatic resumption of interrupted training. API restart marks incomplete jobs as interrupted. Full raw diagnostics and dataset imports remain local administrative operations. The preserved Flower version constrains cryptography to a version with published advisories; see [SECURITY.md](docs/SECURITY.md) before considering remote hosting.
+## Scope and limitations
+
+- One workstation, one simulation at a time; hospitals are simulated partitions of public datasets, not deployed sites.
+- No secure aggregation or differential privacy; model updates could still leak information.
+- The trust rule assumes an honest majority and a small trusted validation set at the server. It does not detect the update-scaling attack, and low trust is a policy decision, not proof of malicious behaviour.
+- The datasets are small, public and in some cases decades old. Calibrated probabilities are still research estimates.
+- Not a medical device and not clinically validated.
+
+For remote hosting, read [SECURITY.md](docs/SECURITY.md) first (authenticated HTTPS reverse proxy, exact allowed hosts, secure cookies).
+
+## Team
+
+Final-year project, Department of Computer Science and Engineering, Sai Vidya Institute of Technology, Bengaluru.
+
+- Manjunath K R
+- Mohit Khajuria
+- Prem Kumar S
+- Sahil Kumar
+
+With Dr. H. R. Ravikumar and Lalitha K, Assistant Professors, Department of CSE.
+
+## Version history
+
+The original PyQt6 desktop prototype (August 2026) is preserved in the Git history under the tag [`v1.0-desktop-prototype`](https://github.com/MohitKhajuria-jk/ta-efl-health/tree/v1.0-desktop-prototype). Changes since then are listed in [docs/CHANGELOG.md](docs/CHANGELOG.md).
