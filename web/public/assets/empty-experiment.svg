@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180" viewBox="0 0 240 180" fill="none">
+  <title>No experiment selected</title>
+  <desc>Original illustration of a research record waiting to be selected.</desc>
+  <ellipse cx="120" cy="153" rx="75" ry="11" fill="#0f766e" opacity=".06"/>
+  <rect x="66" y="25" width="111" height="124" rx="13" fill="#f5f7f8" stroke="#0f766e" stroke-opacity=".3"/>
+  <path d="M88 52h49M88 66h67" stroke="#0f766e" stroke-opacity=".35" stroke-width="5" stroke-linecap="round"/>
+  <path d="M88 122h67M94 115V99m18 16V87m18 28V94m18 21V78" stroke="#0f766e" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="169" cy="130" r="23" fill="#0b1725"/>
+  <path d="M159 130h20m-10-10v20" stroke="#7ce8d3" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="47" cy="81" r="4" fill="#7ce8d3"/><circle cx="195" cy="48" r="3" fill="#0f766e" opacity=".4"/>
+</svg>

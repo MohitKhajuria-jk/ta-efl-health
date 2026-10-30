@@ -1,15 +1,23 @@
-# Real datasets (optional)
+# Dataset folder
 
-Drop any of these CSVs here and the matching dataset will use the real data
-instead of the synthetic cohort. Column names from the standard Kaggle
-releases are adapted automatically.
+Put the genuine CSV files here, unchanged and with these exact names. The
+application validates every file against its documented schema and refuses to
+train on a file that does not match. It never substitutes another dataset.
 
-| file | dataset |
-|---|---|
-| `heart.csv` | UCI/Kaggle Heart Disease (Cleveland) |
-| `diabetes.csv` | Pima Indians Diabetes |
-| `wdbc.csv` / `breast_cancer.csv` | Breast Cancer Wisconsin (also bundled with scikit-learn) |
-| `framingham.csv` | Framingham Heart Study |
-| `healthcare-dataset-stroke-data.csv` | Stroke Prediction |
+| Dataset | File name | Source |
+|---|---|---|
+| Heart Failure Prediction (918 rows) | `heart.csv` | https://www.kaggle.com/datasets/fedesoriano/heart-failure-prediction |
+| Pima Indians Diabetes (768 rows) | `diabetes.csv` (**included**) | Original UCI distribution via pinned mirror, SHA-256 verified by `scripts/fetch_datasets.py`; also on https://www.kaggle.com/datasets/uciml/pima-indians-diabetes-database |
+| Framingham CHD (~4,240 rows) | `framingham.csv` | Framingham teaching extract on Kaggle, e.g. https://www.kaggle.com/datasets/aasheesh200/framingham-heart-study-dataset |
+| Stroke Prediction (5,110 rows) | `healthcare-dataset-stroke-data.csv` | https://www.kaggle.com/datasets/fedesoriano/stroke-prediction-dataset |
+| Breast Cancer Wisconsin Diagnostic (569 rows) | *(none needed)* | bundled in scikit-learn (`load_breast_cancer`) |
 
-Nothing here is committed: patient data should never live in a repository.
+Fetch and check the files with:
+
+```powershell
+python scripts\fetch_datasets.py   # downloads what it can, prints manual Kaggle steps otherwise
+python scripts\check_datasets.py
+```
+
+Respect each dataset's licence and terms of use. These are public research
+datasets, not data from the hospitals simulated in the application.

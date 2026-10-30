@@ -1,6 +1,17 @@
-flwr[simulation]>=1.13
-numpy>=1.24
-pandas>=2.0
-scikit-learn>=1.3
-matplotlib>=3.7
-PyQt6>=6.5
+# TA-EFL Health - Python 3.12 or 3.13 (64-bit) on Windows 11
+# GUI
+PyQt6>=6.7,<7
+# Federated learning (legacy Server/strategy API + protobuf serde are used; Ray is NOT needed)
+flwr==1.26.1
+# Machine learning & data
+numpy>=1.26,<3
+pandas>=2.2,<4
+scikit-learn>=1.5,<2
+joblib>=1.3
+# Explainability (0.53 needs Python >= 3.12)
+shap==0.53.0
+# Charts & reports
+matplotlib>=3.8,<4
+# Tests
+pytest>=8.0
+pytest-qt>=4.4

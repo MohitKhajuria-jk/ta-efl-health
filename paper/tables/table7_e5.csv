@@ -1,6 +1,0 @@
-Dataset,Trust-Aware,FedAvg,Median,Detection margin
-Heart Disease,0.810,0.769,0.802,+0.513
-Pima Diabetes,0.895,0.874,0.891,+0.688
-Breast Cancer Wisconsin,0.977,0.656,0.977,+0.707
-Framingham CHD,0.796,0.720,0.785,+0.484
-Stroke Prediction,0.909,0.828,0.891,+0.199

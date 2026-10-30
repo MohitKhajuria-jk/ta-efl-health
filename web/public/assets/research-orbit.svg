@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="900" viewBox="0 0 1000 900" fill="none">
+  <title>Research orbit</title>
+  <desc>Original abstract artwork of connected concentric planes. Decorative, not a representation of active hospital connections or measured results.</desc>
+  <defs>
+    <linearGradient id="ring" x1="250" y1="180" x2="800" y2="760" gradientUnits="userSpaceOnUse"><stop stop-color="#7ce8d3"/><stop offset=".48" stop-color="#0f766e"/><stop offset="1" stop-color="#0b1725"/></linearGradient>
+    <linearGradient id="edge" x1="220" y1="280" x2="760" y2="610" gradientUnits="userSpaceOnUse"><stop stop-color="#7ce8d3" stop-opacity=".1"/><stop offset=".5" stop-color="#7ce8d3" stop-opacity=".7"/><stop offset="1" stop-color="#7ce8d3" stop-opacity=".08"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#0f766e" stop-opacity=".3"/><stop offset="1" stop-color="#0b1725" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#7ce8d3" opacity=".14"/></pattern>
+  </defs>
+  <rect width="1000" height="900" fill="url(#grid)"/>
+  <ellipse cx="540" cy="450" rx="460" ry="420" fill="url(#glow)"/>
+  <g transform="rotate(-28 530 450)">
+    <ellipse cx="530" cy="488" rx="337" ry="219" stroke="#0f766e" stroke-opacity=".17"/>
+    <ellipse cx="530" cy="468" rx="337" ry="219" stroke="#0f766e" stroke-opacity=".22"/>
+    <ellipse cx="530" cy="448" rx="337" ry="219" stroke="url(#edge)"/>
+    <ellipse cx="530" cy="448" rx="266" ry="173" stroke="url(#ring)" stroke-width="38" opacity=".6"/>
+    <ellipse cx="530" cy="430" rx="266" ry="173" stroke="url(#edge)" stroke-width="1.5"/>
+    <ellipse cx="530" cy="448" rx="196" ry="127" stroke="url(#ring)" stroke-width="26" opacity=".65"/>
+    <ellipse cx="530" cy="435" rx="196" ry="127" stroke="url(#edge)"/>
+    <ellipse cx="530" cy="448" rx="132" ry="86" stroke="url(#ring)" stroke-width="20" opacity=".8"/>
+    <ellipse cx="530" cy="438" rx="132" ry="86" stroke="url(#edge)"/>
+    <path d="M194 448h168m300 0h205M530 228v125m0 190v125" stroke="#7ce8d3" stroke-opacity=".3" stroke-dasharray="4 7"/>
+    <g fill="#0b1725" stroke="#7ce8d3"><circle cx="194" cy="448" r="8"/><circle cx="867" cy="448" r="8"/><circle cx="530" cy="228" r="8"/><circle cx="530" cy="668" r="8"/></g>
+    <g fill="#7ce8d3"><circle cx="194" cy="448" r="2"/><circle cx="867" cy="448" r="2"/><circle cx="530" cy="228" r="2"/><circle cx="530" cy="668" r="2"/></g>
+  </g>
+  <g transform="translate(530 448)">
+    <path d="m0-52 45 26v52L0 52l-45-26v-52Z" fill="#0b1725" stroke="#7ce8d3" stroke-opacity=".75"/>
+    <path d="m-45-26 45 26 45-26M0 0v52" stroke="#7ce8d3" stroke-opacity=".4"/>
+    <path d="M-13-14h26M0-27v26" stroke="#7ce8d3" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>

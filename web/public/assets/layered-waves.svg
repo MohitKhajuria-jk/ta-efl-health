@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="460" viewBox="0 0 1440 460" fill="none">
+  <title>Layered research waves</title>
+  <desc>Original hand-authored SVG inspired by Haikei's layered-wave concept. This is a documented fallback, not an export from Haikei.</desc>
+  <defs><linearGradient id="wave" x1="0" y1="460" x2="1440" y2="200" gradientUnits="userSpaceOnUse"><stop stop-color="#0f766e" stop-opacity=".05"/><stop offset="1" stop-color="#7ce8d3" stop-opacity=".14"/></linearGradient></defs>
+  <path d="M0 246c193 140 320-58 520 8s260 169 455 64 314-118 465-62v204H0Z" fill="url(#wave)"/>
+  <path d="M0 301c183 108 343-76 536-9s277 131 454 49 294-84 450-29v148H0Z" fill="#0f766e" fill-opacity=".12"/>
+  <path d="M0 362c219 54 317-88 546-21s239 81 443 34 288-26 451 12v73H0Z" fill="#0f766e" fill-opacity=".12"/>
+  <path d="M0 246c193 140 320-58 520 8s260 169 455 64 314-118 465-62" stroke="#7ce8d3" stroke-opacity=".22"/>
+</svg>

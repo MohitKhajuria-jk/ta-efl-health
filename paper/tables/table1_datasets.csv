@@ -1,6 +1,0 @@
-Dataset,n,Features,Positive,Source in these runs
-Heart Disease,1500,13,52.6%,Synthetic (UCI-like)
-Pima Diabetes,1500,8,33.9%,Synthetic (Pima-like)
-Breast Cancer Wisconsin,569,10,37.3%,Real (scikit-learn)
-Framingham CHD,2000,14,15.0%,Synthetic (FHS-like)
-Stroke Prediction,2500,10,9.8%,Synthetic (Kaggle-like)

@@ -1,4 +1,4 @@
-# --- Python -----------------------------------------------------------------
+# --- Python ---------------------------------------------------------------
 .venv/
 venv/
 env/
@@ -6,40 +6,39 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
-.ipynb_checkpoints/
 
-# --- Patient data -----------------------------------------------------------
-# Real clinical CSVs must never be committed. The loaders fall back to
-# synthetic cohorts, so the project still runs for anyone who clones it.
+# --- Local research state and configuration --------------------------------
+# Experiment records, models, accounts and web jobs stay on the local machine.
+storage/
+!storage/.gitkeep
+config/settings*.json
+.env
+.env.*
+!.env.example
+
+# --- Datasets ----------------------------------------------------------------
+# Download with scripts/fetch_datasets.py (see data/README.md); never commit
+# patient-level files.
 data/*.csv
+data/*.zip
 data/*.xlsx
 data/*.parquet
 
-# --- LaTeX build artefacts --------------------------------------------------
-# main.pdf is kept deliberately: it is the deliverable.
-paper/*.aux
-paper/*.log
-paper/*.blg
-paper/*.bbl
-paper/*.out
-paper/*.synctex.gz
-paper/*.fls
-paper/*.fdb_latexmk
-paper/*.toc
-paper/overleaf/*.aux
-paper/overleaf/*.log
-paper/overleaf/*.blg
-paper/overleaf/*.bbl
-paper/overleaf/*.out
+# --- Web -------------------------------------------------------------------------
+web/node_modules/
+web/dist/
+web/test-results/
+*.tsbuildinfo
 
-# Extracted copy of paper/ta_efl_paper_latex.zip -- duplicates paper/overleaf/
-paper/ta_efl_paper_latex/
+# --- Test and debug output -------------------------------------------------
+test-results/
+debug.log
 
-# --- Office / OS ------------------------------------------------------------
-*.lnk
+# --- Office / OS -------------------------------------------------------------
 ~$*.docx
 ~$*.xlsx
 ~$*.pptx
+*.lnk
 .DS_Store
 Thumbs.db
 desktop.ini
